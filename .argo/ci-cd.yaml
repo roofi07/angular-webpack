@@ -1,0 +1,97 @@
+---
+type: workflow
+version: 1
+name: example-app-build
+description: Example app
+inputs:
+  parameters:
+    COMMIT:
+      default: "%%session.commit%%"
+    REPO:
+      default: "%%session.repo%%"
+steps:
+- CHECKOUT:
+    template: argo-checkout
+- UI-BUILD:
+    image: node:6.11
+    resources:
+      mem_mib: 2048
+      cpu_cores: 0.2
+    command: ["sh", "-c"]
+    args: [cd /src && make front]
+    inputs:
+      artifacts:
+        CODE:
+          from: "%%steps.CHECKOUT.outputs.artifacts.CODE%%"
+          path: /src
+    outputs:
+      artifacts:
+        STATICS:
+          path: /src/dist
+        NGINX-CONF:
+          path: /src/nginx.conf
+outputs:
+  artifacts:
+    NGINX-CONF:
+      from: "%%steps.API-BUILD.outputs.artifacts.NGINX-CONF%%"
+    STATICS:
+      from: "%%steps.UI-BUILD.outputs.artifacts.STATICS%%"
+
+---
+type: workflow
+version: 1
+name: example-app-build-deploy
+description: Example app
+inputs:
+  parameters:
+    COMMIT:
+      default: "%%session.commit%%"
+    REPO:
+      default: "%%session.repo%%"
+    APPLICATION:
+      default: "example-app"
+    DOMAIN-NAME:
+      default: " "
+    DNS-PREFIX:
+      default: "example-app"
+steps:
+- BUILD:
+    template: example-app-build
+  DEPLOY-LB:
+    template: example-app-lb-deploy
+    arguments:
+      artifacts.NGINX-CONF: "%%steps.BUILD.outputs.artifacts.NGINX-CONF%%"
+      artifacts.STATICS: "%%steps.BUILD.outputs.artifacts.STATICS%%"
+
+---
+type: deployment
+name: example-app-lb-deploy
+application_name: "%%inputs.parameters.APPLICATION%%"
+deployment_name: example-app-lb
+scale:
+  min: 1
+external_routes:
+- dns_prefix: "%%inputs.parameters.DNS-PREFIX%%"
+  dns_domain: "%%inputs.parameters.DOMAIN-NAME%%"
+  target_port: 8666
+  ip_white_list:
+  - 0.0.0.0/0
+containers:
+  API:
+    image: nginx
+    inputs:
+      artifacts:
+        NGINX-CONF:
+          from: "%%inputs.artifacts.NGINX-CONF%%"
+          path: /etc/nginx
+        STATICS:
+          from: "%%inputs.artifacts.STATICS%%"
+          path: /dist
+inputs:
+  parameters:
+    APPLICATION:
+    DNS-PREFIX:
+    DOMAIN-NAME:
+  artifacts:
+    NGINX-CONF:
+    STATICS:
