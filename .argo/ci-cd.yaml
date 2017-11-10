@@ -33,7 +33,7 @@ steps:
 outputs:
   artifacts:
     NGINX-CONF:
-      from: "%%steps.API-BUILD.outputs.artifacts.NGINX-CONF%%"
+      from: "%%steps.UI-BUILD.outputs.artifacts.NGINX-CONF%%"
     STATICS:
       from: "%%steps.UI-BUILD.outputs.artifacts.STATICS%%"
 
@@ -57,7 +57,7 @@ inputs:
 steps:
 - BUILD:
     template: example-app-build
-  DEPLOY-LB:
+- DEPLOY-LB:
     template: example-app-lb-deploy
     arguments:
       artifacts.NGINX-CONF: "%%steps.BUILD.outputs.artifacts.NGINX-CONF%%"
